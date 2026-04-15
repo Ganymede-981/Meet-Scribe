@@ -32,7 +32,7 @@ import {
 import type { User } from 'firebase/auth';
 
 const BACKEND_URL =
-  (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'http://localhost:3001';
+  (import.meta.env.VITE_BACKEND_URL as string | undefined) || '';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);

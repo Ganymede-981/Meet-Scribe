@@ -116,7 +116,15 @@ export function useMeetBot({ backendUrl, userId }: UseMeetBotProps): UseMeetBotR
   // ── Open WebSocket to backend ────────────────────────────────
   const openWebSocket = useCallback((sessionId: string): Promise<void> => {
     return new Promise((resolve, reject) => {
-      const wsUrl = backendUrl.replace(/^http/, 'ws') + `/ws?sessionId=${sessionId}`;
+      let wsUrl: string;
+      if (backendUrl) {
+        // Use absolute URL if provided (e.g. localhost or direct EB)
+        wsUrl = backendUrl.replace(/^http/, 'ws') + `/ws?sessionId=${sessionId}`;
+      } else {
+        // Use relative path for Netlify proxying
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        wsUrl = `${protocol}//${window.location.host}/api/ws?sessionId=${sessionId}`;
+      }
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 

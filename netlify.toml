@@ -8,7 +8,8 @@
 
 # ─── SPA routing — every path falls back to index.html ───────────────────────
 [[redirects]]
-  from   = "/*"
-  to     = "/index.html"
+  from = "/api/*"
+  to = "http://scribeai-backend-prod.eba-jjebgtut.ap-south-1.elasticbeanstalk.com/api/:splat"
   status = 200
+  force = true
 

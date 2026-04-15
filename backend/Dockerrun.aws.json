@@ -1,0 +1,20 @@
+{
+  "AWSEBDockerrunVersion": "1",
+  "Ports": [
+    {
+      "ContainerPort": "3001",
+      "HostPort": "3001"
+    }
+  ],
+  "Volumes": [
+    {
+      "HostDirectory": "/var/app/bot-profile",
+      "ContainerDirectory": "/app/bot-profile"
+    },
+    {
+      "HostDirectory": "/var/app/tmp",
+      "ContainerDirectory": "/app/tmp"
+    }
+  ],
+  "Logging": "/var/log/nodejs"
+}

@@ -1,0 +1,51 @@
+version: '3.9'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: meet-scribe-backend
+    container_name: scribeai-backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - FRONTEND_URL=http://localhost  # update to your real domain
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      # Paste your entire serviceAccountKey.json content as a single-line string:
+      - FIREBASE_SERVICE_ACCOUNT_JSON=${FIREBASE_SERVICE_ACCOUNT_JSON}
+      # Optional: path to a custom Chrome/Chromium binary inside the container
+      # - CHROME_EXECUTABLE_PATH=/usr/bin/chromium-browser
+    volumes:
+      # Persist the bot-profile (Chrome session) and temp audio uploads across restarts
+      - bot-profile:/app/bot-profile
+      - uploads:/app/tmp
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # VITE_ vars must be passed as build-args so Vite can bake them into the JS bundle
+      args:
+        - VITE_BACKEND_URL=${VITE_BACKEND_URL:-http://localhost:3001}
+        - VITE_FB_API_KEY=${VITE_FB_API_KEY}
+        - VITE_FB_AUTH_DOMAIN=${VITE_FB_AUTH_DOMAIN}
+        - VITE_FB_PROJECT_ID=${VITE_FB_PROJECT_ID}
+        - VITE_FB_STORAGE_BUCKET=${VITE_FB_STORAGE_BUCKET}
+        - VITE_FB_MESSAGING_SENDER_ID=${VITE_FB_MESSAGING_SENDER_ID}
+        - VITE_FB_APP_ID=${VITE_FB_APP_ID}
+    image: meet-scribe-frontend
+    container_name: scribeai-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  bot-profile:
+  uploads:

@@ -1,0 +1,47 @@
+# ── Environment / Secrets ──────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+backend/.env
+backend/.env.local
+
+# ── Firebase Service Account (NEVER commit this!) ───────────────────────────
+backend/serviceAccountKey.json
+serviceAccountKey.json
+backend/auth.json
+
+# ── Dependencies ───────────────────────────────────────────────────────────────
+node_modules/
+backend/node_modules/
+
+# ── Build Output ───────────────────────────────────────────────────────────────
+dist/
+backend/dist/
+build/
+
+# ── Playwright Bot Artifacts ────────────────────────────────────────────────
+# Chrome session profile (contains Google login cookies — keep off GitHub)
+backend/bot-profile/
+# Temporary audio uploads
+backend/tmp/
+tmp/
+# Debug screenshots from bot errors
+backend/*.png
+*.png
+
+# ── Logs & Debug ───────────────────────────────────────────────────────────────
+*.log
+ts_errors.txt
+ts_errors_final.txt
+logs/
+*.error.txt
+
+# ── OS / Editor ────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ── Playwright / Test Artifacts ────────────────────────────────────────────────
+test-results/
+playwright-report/

@@ -1,0 +1,10 @@
+node_modules
+dist
+tmp
+bot-profile
+.env
+.env.*
+!.env.production.example
+*.png
+*.log
+.ebextensions

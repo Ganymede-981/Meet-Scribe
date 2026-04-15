@@ -1,0 +1,38 @@
+# ─── Build settings ───────────────────────────────────────────────────────────
+[build]
+  command   = "npm run build"
+  publish   = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# ─── SPA routing — every path falls back to index.html ───────────────────────
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
+
+# ─── Production environment variables ─────────────────────────────────────────
+# These are baked into the JS bundle at build time by Vite (VITE_ prefix).
+# Set REAL values in the Netlify UI: Site Settings → Environment Variables.
+# DO NOT commit secrets here — the values below are placeholders only.
+[context.production.environment]
+  # Backend URL (your AWS / Railway / Render backend, no trailing slash)
+  VITE_BACKEND_URL              = "https://your-backend.elasticbeanstalk.com"
+  # Firebase project config (from Firebase Console → Project Settings → Your apps)
+  VITE_FB_API_KEY               = "your-firebase-api-key"
+  VITE_FB_AUTH_DOMAIN           = "your-project.firebaseapp.com"
+  VITE_FB_PROJECT_ID            = "your-project-id"
+  VITE_FB_STORAGE_BUCKET        = "your-project.appspot.com"
+  VITE_FB_MESSAGING_SENDER_ID   = "000000000000"
+  VITE_FB_APP_ID                = "1:000000000000:web:abc123"
+
+[context.deploy-preview.environment]
+  # Preview deploys use the same backend and Firebase project
+  VITE_BACKEND_URL              = "https://your-backend.elasticbeanstalk.com"
+  VITE_FB_API_KEY               = "your-firebase-api-key"
+  VITE_FB_AUTH_DOMAIN           = "your-project.firebaseapp.com"
+  VITE_FB_PROJECT_ID            = "your-project-id"
+  VITE_FB_STORAGE_BUCKET        = "your-project.appspot.com"
+  VITE_FB_MESSAGING_SENDER_ID   = "000000000000"
+  VITE_FB_APP_ID                = "1:000000000000:web:abc123"

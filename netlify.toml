@@ -7,7 +7,7 @@
 
 [[redirects]]
   from = "/api/*"
-  to = "https://scribeai-backend.onrender.com/api/:splat"
+  to = "https://meet-scribe-zw7b.onrender.com/api/:splat"
   status = 200
   force = true
 

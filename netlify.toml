@@ -7,7 +7,7 @@
 
 [[redirects]]
   from = "/api/*"
-  to = "http://scribeai-backend-prod.eba-jjebgtut.ap-south-1.elasticbeanstalk.com/api/:splat"
+  to = "https://scribeai-backend.onrender.com/api/:splat"
   status = 200
   force = true
 

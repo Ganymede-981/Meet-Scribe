@@ -9,7 +9,13 @@ export function initFirebaseAdmin(): void {
   try {
     let credential: admin.credential.Credential;
 
-    if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
+      const decoded = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64.trim(), 'base64').toString('utf8');
+      const serviceAccount = JSON.parse(decoded);
+      credential = admin.credential.cert(serviceAccount);
+      console.log('[Firebase Admin] Parsed service account from BASE64 for project:', serviceAccount.project_id);
+    }
+    else if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
       let raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON.trim();
       // If the user copy-pasted and accidentally missed the final '}', auto-append it
       if (!raw.endsWith('}')) {
@@ -23,7 +29,7 @@ export function initFirebaseAdmin(): void {
       }
 
       credential = admin.credential.cert(serviceAccount);
-      console.log('[Firebase Admin] Parsed service account for project:', serviceAccount.project_id);
+      console.log('[Firebase Admin] Parsed service account from JSON for project:', serviceAccount.project_id);
     }
     // Option 2: Path to JSON file (local dev)
     else if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {

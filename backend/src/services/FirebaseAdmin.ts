@@ -11,8 +11,17 @@ export function initFirebaseAdmin(): void {
 
     // Option 1: JSON string in env (great for cloud deployments)
     if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+      let raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+      // Render sometimes wraps env var values — strip outer quotes if present
+      if (raw.startsWith('"') && raw.endsWith('"')) {
+        raw = raw.slice(1, -1);
+      }
+      // Replace literal \n sequences (not real newlines) that some editors introduce
+      // JSON.parse handles real \n in strings fine, but if pasted badly they become \\n
+      raw = raw.replace(/\\n/g, '\n');
+      const serviceAccount = JSON.parse(raw);
       credential = admin.credential.cert(serviceAccount);
+      console.log('[Firebase Admin] Parsed service account for project:', serviceAccount.project_id);
     }
     // Option 2: Path to JSON file (local dev)
     else if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
@@ -31,9 +40,10 @@ export function initFirebaseAdmin(): void {
 
     admin.initializeApp({ credential });
     initialized = true;
-    console.log('[Firebase Admin] Initialized successfully');
+    console.log('[Firebase Admin] Initialized successfully ✅');
   } catch (err) {
-    console.error('[Firebase Admin] Init failed:', err);
+    console.error('[Firebase Admin] Init failed ❌:', err);
+    console.error('[Firebase Admin] Check that FIREBASE_SERVICE_ACCOUNT_JSON is valid JSON with no extra escaping.');
   }
 }
 

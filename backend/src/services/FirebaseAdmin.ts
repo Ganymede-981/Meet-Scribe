@@ -10,7 +10,11 @@ export function initFirebaseAdmin(): void {
     let credential: admin.credential.Credential;
 
     if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-      const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+      let raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON.trim();
+      // If the user copy-pasted and accidentally missed the final '}', auto-append it
+      if (!raw.endsWith('}')) {
+        raw += '}';
+      }
       const serviceAccount = JSON.parse(raw);
       
       // If the user pasted a string that literally contains "\\n" instead of "\n", fix it on the object

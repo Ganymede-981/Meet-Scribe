@@ -95,22 +95,39 @@ export function useMeetBot({ backendUrl, userId }: UseMeetBotProps): UseMeetBotR
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const res = await fetch(`${backendUrl}/api/start`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        meetUrl: url,
-        useBot: mode === 'bot', // only launch Puppeteer if bot mode
-      }),
-    });
+    // Allow up to 90s for first request — Render free tier cold-starts take 30-60s
+    const controller = new AbortController();
+    const coldStartTimeout = setTimeout(() => controller.abort(), 90_000);
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: 'Backend request failed' }));
-      throw new Error(err.error ?? `Server error ${res.status}`);
+    try {
+      const res = await fetch(`${backendUrl}/api/start`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          meetUrl: url,
+          useBot: mode === 'bot',
+        }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Backend request failed' }));
+        throw new Error(err.error ?? `Server error ${res.status}`);
+      }
+
+      const { sessionId } = await res.json();
+      return sessionId;
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw new Error('Server is taking too long to respond. It may be waking up — please try again in 30 seconds.');
+      }
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        throw new Error('Cannot reach backend. Check that VITE_BACKEND_URL is set correctly in Netlify.');
+      }
+      throw err;
+    } finally {
+      clearTimeout(coldStartTimeout);
     }
-
-    const { sessionId } = await res.json();
-    return sessionId;
   }, [backendUrl]);
 
   // ── Open WebSocket to backend ────────────────────────────────
@@ -118,12 +135,15 @@ export function useMeetBot({ backendUrl, userId }: UseMeetBotProps): UseMeetBotR
     return new Promise((resolve, reject) => {
       let wsUrl: string;
       if (backendUrl) {
-        // Use absolute URL if provided (e.g. localhost or direct EB)
-        wsUrl = backendUrl.replace(/^http/, 'ws') + `/ws?sessionId=${sessionId}`;
+        // Direct connection to backend — handles both http:// and https:// origins
+        // Replace https:// → wss://  or  http:// → ws://
+        wsUrl = backendUrl.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://') + `/ws?sessionId=${sessionId}`;
       } else {
-        // Use relative path for Netlify proxying
+        // Relative path fallback — only works when backend is same-origin.
+        // NOTE: Netlify cannot proxy WebSocket upgrades, so this WILL fail
+        // unless VITE_BACKEND_URL is set to the Render URL.
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        wsUrl = `${protocol}//${window.location.host}/api/ws?sessionId=${sessionId}`;
+        wsUrl = `${protocol}//${window.location.host}/ws?sessionId=${sessionId}`;
       }
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;

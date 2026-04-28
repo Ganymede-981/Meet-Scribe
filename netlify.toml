@@ -1,16 +1,22 @@
 [build]
   command = "npm run build"
-  publish = "dist" # (Make sure this matches your build folder, it might be 'build' instead of 'dist')
+  publish = "dist"
 
 [build.environment]
   NODE_VERSION = "20"
 
+# ── API proxy: forward /api/* → Render backend ─────────────────────────
+# NOTE: WebSocket (wss://) cannot be proxied through Netlify redirects.
+# The frontend must connect WebSockets DIRECTLY to the Render backend URL.
+# Set VITE_BACKEND_URL=https://meet-scribe-zw7b.onrender.com in Netlify
+# Site Settings → Environment Variables so the WS client bypasses this proxy.
 [[redirects]]
   from = "/api/*"
   to = "https://meet-scribe-zw7b.onrender.com/api/:splat"
   status = 200
   force = true
 
+# ── SPA fallback: must be LAST ─────────────────────────────────────────
 [[redirects]]
   from = "/*"
   to = "/index.html"

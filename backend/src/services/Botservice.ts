@@ -25,11 +25,13 @@ export class BotService {
             onStatusChange("initializing", 10);
 
             // 1. Launch Browser with Stealth flags
+            const isProduction = process.env.NODE_ENV === 'production';
             this.browser = await chromium.launch({
-                headless: false, // Visible for better debugging and less detection
+                headless: isProduction, // headless=true on server (no display), visible locally for debugging
                 args: [
                     "--no-sandbox",
                     "--disable-setuid-sandbox",
+                    "--disable-gpu",              // required for headless Linux (Render/Docker)
                     "--use-fake-ui-for-media-stream",
                     "--use-fake-device-for-media-stream",
                     "--disable-blink-features=AutomationControlled",

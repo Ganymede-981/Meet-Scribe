@@ -9,17 +9,15 @@ export function initFirebaseAdmin(): void {
   try {
     let credential: admin.credential.Credential;
 
-    // Option 1: JSON string in env (great for cloud deployments)
     if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-      let raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-      // Render sometimes wraps env var values — strip outer quotes if present
-      if (raw.startsWith('"') && raw.endsWith('"')) {
-        raw = raw.slice(1, -1);
-      }
-      // Replace literal \n sequences (not real newlines) that some editors introduce
-      // JSON.parse handles real \n in strings fine, but if pasted badly they become \\n
-      raw = raw.replace(/\\n/g, '\n');
+      const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
       const serviceAccount = JSON.parse(raw);
+      
+      // If the user pasted a string that literally contains "\\n" instead of "\n", fix it on the object
+      if (typeof serviceAccount.private_key === 'string') {
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+      }
+
       credential = admin.credential.cert(serviceAccount);
       console.log('[Firebase Admin] Parsed service account for project:', serviceAccount.project_id);
     }

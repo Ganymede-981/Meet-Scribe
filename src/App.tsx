@@ -31,14 +31,10 @@ import {
 } from './services/FirebaseService';
 import type { User } from 'firebase/auth';
 
-// WS goes directly to Render (Netlify can't proxy WebSocket)
+// Backend URL used for BOTH WebSocket and HTTP REST calls.
+// Set VITE_BACKEND_URL=https://meet-scribe-zw7b.onrender.com in Render env vars.
 const BACKEND_URL =
   (import.meta.env.VITE_BACKEND_URL as string | undefined) || '';
-
-// HTTP REST root: empty string = relative paths = Netlify proxy handles HTTPS.
-// In local dev (no proxy), fall back to BACKEND_URL so /api/start resolves correctly.
-const IS_DEV = import.meta.env.DEV;
-const API_ROOT = IS_DEV ? BACKEND_URL : '';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -62,7 +58,7 @@ const App: React.FC = () => {
     deployBot,
     stopRecording,
     reset,
-  } = useMeetBot({ backendUrl: BACKEND_URL, apiRoot: API_ROOT, userId: user?.uid ?? null });
+  } = useMeetBot({ backendUrl: BACKEND_URL, userId: user?.uid ?? null });
 
   // ── Auth state listener ──────────────────────────────────────
   useEffect(() => {
@@ -86,7 +82,7 @@ const App: React.FC = () => {
     getIdToken().then(async (token) => {
       if (!token) return;
       try {
-        const res = await fetch(`${API_ROOT}/api/meetings`, {
+        const res = await fetch(`${BACKEND_URL}/api/meetings`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) return;

@@ -13,9 +13,8 @@ export type BotStatus =
 export type RecordingMode = 'audio' | 'bot';
 
 interface UseMeetBotProps {
-  backendUrl: string; // Full Render URL for WebSocket (e.g. "https://meet-scribe-zw7b.onrender.com")
-  apiRoot?: string;   // Root URL for HTTP REST calls. Leave empty for relative paths (Netlify proxy).
-                      // In local dev set to "http://localhost:3001"
+  backendUrl: string; // Backend URL for both WebSocket and HTTP (e.g. "https://meet-scribe-zw7b.onrender.com")
+  apiRoot?: string;   // Optional override for HTTP root. Defaults to backendUrl.
   userId: string | null;
 }
 
@@ -67,8 +66,8 @@ function saveLocal(meetUrl: string, summary: string, transcript: string[], userI
 }
 
 export function useMeetBot({ backendUrl, apiRoot, userId }: UseMeetBotProps): UseMeetBotReturn {
-  // httpRoot: base for all REST calls. Empty string = relative URL = Netlify proxy handles it.
-  const httpRoot = apiRoot ?? '';
+  // httpRoot: base for all REST API calls. Falls back to backendUrl so HTTP and WS always hit the same server.
+  const httpRoot = apiRoot ?? backendUrl;
   const [status, setStatus] = useState<BotStatus>('idle');
   const [meetUrl, setMeetUrl] = useState('');
   const [summary, setSummary] = useState<string | null>(null);

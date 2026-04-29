@@ -26,7 +26,12 @@ export async function requireAuth(
   const token = authHeader.slice(7);
 
   // Skip verification in dev if Firebase is not configured
-  if (!process.env.FIREBASE_SERVICE_ACCOUNT_PATH && !process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+  // Skip verification in dev if Firebase is not configured at all
+  if (
+    !process.env.FIREBASE_SERVICE_ACCOUNT_PATH &&
+    !process.env.FIREBASE_SERVICE_ACCOUNT_JSON &&
+    !process.env.FIREBASE_SERVICE_ACCOUNT_BASE64
+  ) {
     console.warn('[Auth] Firebase not configured — skipping token verification (dev mode)');
     req.userId = 'dev-user';
     req.userEmail = 'dev@local';

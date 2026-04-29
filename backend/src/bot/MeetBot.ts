@@ -309,12 +309,10 @@ export class MeetBot {
     );
 
 
-    // Wait for aria-live region to appear (captions container)
-    await page.waitForSelector('[aria-live]', { timeout: 60_000 });
-    await page.waitForFunction(
-      "Array.from(document.querySelectorAll('[aria-live]')).some(function(el) { return el.textContent && el.textContent.trim().length > 0; })",
-      { timeout: 60_000 }
-    ).catch(() => { console.log('[Bot] aria-live timeout — proceeding anyway'); });
+    // Wait for the aria-live element to be in the DOM (it is always hidden in Meet —
+    // do NOT use the default state:'visible' which causes a 60-second timeout crash).
+    await page.waitForSelector('[aria-live]', { state: 'attached', timeout: 30_000 })
+      .catch(() => console.log('[Bot] aria-live element not found after 30s — proceeding anyway'));
 
     // ── Browser-side MutationObserver ────────────────────────────────────────
     // CRITICAL: Passed as a STRING so esbuild/tsx never transforms it.

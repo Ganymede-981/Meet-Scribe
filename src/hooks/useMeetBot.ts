@@ -192,8 +192,20 @@ export function useMeetBot({ backendUrl, userId }: UseMeetBotProps): UseMeetBotR
         } catch { /* ignore malformed messages */ }
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         wsRef.current = null;
+        // If the WS closes while the session is still in an active/mid-flight state,
+        // the server likely restarted (Render redeploy). Show a clear error so the
+        // user doesn't sit on a frozen "Waiting…" screen forever.
+        setStatus((current) => {
+          if (['initializing', 'connecting', 'active'].includes(current)) {
+            setErrorMessage(
+              'Connection lost — the server may have restarted. Your session has ended. Please try again.'
+            );
+            return 'error';
+          }
+          return current;
+        });
       };
     });
   }, [backendUrl]);
@@ -322,17 +334,34 @@ export function useMeetBot({ backendUrl, userId }: UseMeetBotProps): UseMeetBotR
 
     // For bot mode, send stop signal to backend
     if (recordingMode === 'bot' && sessionIdRef.current) {
-      getIdToken().then((token) => {
+      getIdToken().then(async (token) => {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
-        fetch(`${backendUrl}/api/stop`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ sessionId: sessionIdRef.current }),
-        }).catch(console.error);
+        try {
+          const res = await fetch(`${backendUrl}/api/stop`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ sessionId: sessionIdRef.current }),
+          });
+          if (!res.ok) {
+            const errBody = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+            if (res.status === 404) {
+              // Session not found — server likely restarted, clearing in-memory sessions.
+              setErrorMessage(
+                'Session expired (server restarted). No summary can be generated for this session. Please start a new one.'
+              );
+              setStatus('error');
+            } else {
+              setErrorMessage(errBody.error ?? `Stop request failed (${res.status})`);
+              setStatus('error');
+            }
+          }
+        } catch (err) {
+          console.error('[stopRecording] fetch error:', err);
+        }
       });
     }
-  }, [backendUrl, recordingMode]);
+  }, [backendUrl, recordingMode, setStatus, setErrorMessage]);
 
   // ── Save locally if backend/Firestore not available ──────────
   useEffect(() => {

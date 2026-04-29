@@ -99,16 +99,24 @@ export class MeetBot {
         headless,
         executablePath: chromeExe,
         args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--use-fake-ui-for-media-stream",
-          "--use-fake-device-for-media-stream",
-          "--disable-blink-features=AutomationControlled",
-          "--disable-infobars",
-          "--window-size=1280,800",
-          ...(isProduction ? ["--disable-gpu", "--single-process"] : []),
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--use-fake-ui-for-media-stream',
+          '--use-fake-device-for-media-stream',
+          '--disable-blink-features=AutomationControlled',
+          '--disable-infobars',
+          '--window-size=1280,800',
+          // Low-RAM container flags (replaces the broken --single-process)
+          ...(isProduction ? [
+            '--disable-gpu',
+            '--disable-dev-shm-usage', // Avoids /dev/shm OOM in Docker/Render
+            '--disable-extensions',
+            '--disable-background-networking',
+            '--disable-default-apps',
+            '--no-first-run',
+          ] : []),
         ],
-        ignoreDefaultArgs: ["--enable-automation"],
+        ignoreDefaultArgs: ['--enable-automation'],
       });
       this.browser = browser;
 
@@ -666,6 +674,10 @@ export class MeetBot {
 
   async stop(): Promise<void> {
     this.exitRequested = true;
+    // Give the scrape loop up to 3 seconds to notice exitRequested,
+    // then force-close the browser regardless.
+    await new Promise<void>((resolve) => setTimeout(resolve, 3000));
+    await this.cleanup();
   }
 
   private async cleanup(): Promise<void> {

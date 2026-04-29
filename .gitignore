@@ -9,6 +9,11 @@ backend/.env.local
 backend/serviceAccountKey.json
 serviceAccountKey.json
 backend/auth.json
+# Service account export helpers (contain raw credentials)
+backend/auth_render.txt
+backend/service_account_base64.txt
+backend/service_account_minified.txt
+test.js
 
 # ── Dependencies ───────────────────────────────────────────────────────────────
 node_modules/

@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { mkdirSync } from 'fs';
 import { apiRouter } from './routes/api.js';
 import { initFirebaseAdmin } from './services/FirebaseAdmin.js';
+import { MeetBot } from './bot/MeetBot.js';
 
 // Ensure tmp/ directory exists for multer audio uploads
 mkdirSync('tmp', { recursive: true });
@@ -114,3 +115,21 @@ server.listen(PORT, () => {
   console.log(`\n🚀 ScribeAI backend running at http://localhost:${PORT}`);
   console.log(`   WebSocket server at ws://localhost:${PORT}\n`);
 });
+
+// ─── Graceful shutdown (Render sends SIGTERM on redeploy) ────
+// Export a registry so the api router can register bot instances.
+export const activeBots = new Set<MeetBot>();
+
+async function gracefulShutdown(signal: string) {
+  console.log(`[Server] ${signal} received — stopping ${activeBots.size} active bot(s) and shutting down...`);
+  await Promise.allSettled([...activeBots].map((b) => b.stop()));
+  server.close(() => {
+    console.log('[Server] HTTP server closed. Goodbye.');
+    process.exit(0);
+  });
+  // Force-exit after 15 seconds as a last resort
+  setTimeout(() => process.exit(1), 15_000).unref();
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

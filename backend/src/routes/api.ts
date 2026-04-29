@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import { unlink } from 'fs/promises';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
-import { createSession, sessions, broadcastToSession } from '../index.js';
+import { createSession, sessions, broadcastToSession, activeBots } from '../index.js';
 import { MeetBot } from '../bot/MeetBot.js';
 import { processAudio, summarizeTranscript, isValidMeetUrl } from '../services/GroqService.js';
 import { saveMeetingRecord, getUserMeetings } from '../services/FirebaseAdmin.js';
@@ -36,6 +36,9 @@ const upload = multer({
 // Track bot instances per session so we can stop them
 const botInstances = new Map<string, MeetBot>();
 
+// Track which sessions are active per user — prevents zombie bots on reconnect
+const userActiveSessions = new Map<string, string>(); // userId → sessionId
+
 // ── POST /api/start ────────────────────────────────────────────
 apiRouter.post('/start', requireAuth, async (req: AuthenticatedRequest, res) => {
   const { meetUrl, useBot = false } = req.body as { meetUrl: string; useBot?: boolean };
@@ -44,19 +47,39 @@ apiRouter.post('/start', requireAuth, async (req: AuthenticatedRequest, res) => 
     return res.status(400).json({ error: 'Invalid Google Meet URL format' });
   }
 
-  const session = createSession(req.userId!, meetUrl);
-  console.log(`[API] Session created: ${session.id} for user ${req.userId}`);
+  const userId = req.userId!;
+
+  // ── Guard: kill any existing bot for this user before starting a new one ──
+  // This prevents zombie Chromium instances when the frontend reconnects or the
+  // user clicks "Deploy Bot" a second time.
+  if (useBot) {
+    const existingSessionId = userActiveSessions.get(userId);
+    if (existingSessionId) {
+      const existingBot = botInstances.get(existingSessionId);
+      if (existingBot) {
+        console.log(`[API] Stopping existing bot for user ${userId} (session ${existingSessionId}) before starting a new one`);
+        existingBot.stop().catch(() => {});
+      }
+      userActiveSessions.delete(userId);
+    }
+  }
+
+  const session = createSession(userId, meetUrl);
+  console.log(`[API] Session created: ${session.id} for user ${userId}`);
 
   // 1. Send the Session ID to the frontend IMMEDIATELY so the WebSocket connects
   res.json({ sessionId: session.id });
 
   // 2. Launch the Playwright bot in the background (Non-blocking)
   if (useBot) {
+    userActiveSessions.set(userId, session.id);
     const bot = new MeetBot();
     botInstances.set(session.id, bot);
+    activeBots.add(bot);
 
     bot.joinMeeting(session.id, meetUrl).then(async (success) => {
       // THIS RUNS WHEN THE BOT LEAVES THE MEETING
+      userActiveSessions.delete(userId);
       const currentSession = sessions.get(session.id);
 
       // Summarize if there is ANY transcript — regardless of whether the bot exited
@@ -65,7 +88,7 @@ apiRouter.post('/start', requireAuth, async (req: AuthenticatedRequest, res) => 
       if (currentSession && currentSession.transcript.length > 0 && !currentSession.summary) {
         try {
           // Lock the summary state to prevent race conditions if the user clicks Stop simultaneously
-          currentSession.summary = "processing";
+          currentSession.summary = 'processing';
           broadcastToSession(session.id, { type: 'status', status: 'processing', progress: 80 });
 
           const fullText = currentSession.transcript.join('\n');
@@ -77,7 +100,7 @@ apiRouter.post('/start', requireAuth, async (req: AuthenticatedRequest, res) => 
 
           await saveMeetingRecord({
             sessionId: session.id,
-            userId: req.userId!,
+            userId,
             meetUrl: currentSession.meetUrl,
             transcript: currentSession.transcript,
             summary,
@@ -96,10 +119,13 @@ apiRouter.post('/start', requireAuth, async (req: AuthenticatedRequest, res) => 
       }
 
       // Cleanup bot instance
+      activeBots.delete(bot);
       botInstances.delete(session.id);
 
     }).catch((err) => {
       console.error(`[Bot] Unhandled error in session ${session.id}:`, err);
+      userActiveSessions.delete(userId);
+      activeBots.delete(bot);
       botInstances.delete(session.id);
     });
   }

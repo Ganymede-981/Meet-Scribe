@@ -13,7 +13,9 @@ export type BotStatus =
 export type RecordingMode = 'audio' | 'bot';
 
 interface UseMeetBotProps {
-  backendUrl: string; // e.g. "http://localhost:3001"
+  backendUrl: string; // Full Render URL for WebSocket (e.g. "https://meet-scribe-zw7b.onrender.com")
+  apiRoot?: string;   // Root URL for HTTP REST calls. Leave empty for relative paths (Netlify proxy).
+                      // In local dev set to "http://localhost:3001"
   userId: string | null;
 }
 
@@ -64,7 +66,9 @@ function saveLocal(meetUrl: string, summary: string, transcript: string[], userI
   } catch { /* storage full or blocked */ }
 }
 
-export function useMeetBot({ backendUrl, userId }: UseMeetBotProps): UseMeetBotReturn {
+export function useMeetBot({ backendUrl, apiRoot, userId }: UseMeetBotProps): UseMeetBotReturn {
+  // httpRoot: base for all REST calls. Empty string = relative URL = Netlify proxy handles it.
+  const httpRoot = apiRoot ?? '';
   const [status, setStatus] = useState<BotStatus>('idle');
   const [meetUrl, setMeetUrl] = useState('');
   const [summary, setSummary] = useState<string | null>(null);
@@ -100,7 +104,7 @@ export function useMeetBot({ backendUrl, userId }: UseMeetBotProps): UseMeetBotR
     const coldStartTimeout = setTimeout(() => controller.abort(), 90_000);
 
     try {
-      const res = await fetch(`${backendUrl}/api/start`, {
+      const res = await fetch(`${httpRoot}/api/start`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -271,7 +275,7 @@ export function useMeetBot({ backendUrl, userId }: UseMeetBotProps): UseMeetBotR
         const headers: Record<string, string> = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        await fetch(`${backendUrl}/api/process-audio`, {
+        await fetch(`${httpRoot}/api/process-audio`, {
           method: 'POST',
           headers,
           body: formData,
@@ -338,7 +342,7 @@ export function useMeetBot({ backendUrl, userId }: UseMeetBotProps): UseMeetBotR
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
         try {
-          const res = await fetch(`${backendUrl}/api/stop`, {
+          const res = await fetch(`${httpRoot}/api/stop`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ sessionId: sessionIdRef.current }),

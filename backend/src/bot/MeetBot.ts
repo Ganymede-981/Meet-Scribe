@@ -584,59 +584,86 @@ export class MeetBot {
   }
 
   private async ensureCaptionsOn(page: Page) {
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(4000);
 
-    // Close any blocking overlays
+    // Click body to give page keyboard focus (required for shortcuts)
+    await page.mouse.click(640, 400).catch(() => {});
+    await page.waitForTimeout(500);
+
+    // Dismiss any blocking overlays (dialogs, permission prompts, etc.)
     const overlay = page.locator('div[data-disable-esc-to-close="true"]');
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 5; i++) {
       if (!(await overlay.isVisible().catch(() => false))) break;
       await page.keyboard.press("Escape");
       await page.waitForTimeout(200);
     }
 
-    // Try Shift+C up to 10 times
-    for (let i = 0; i < 10; i++) {
-      console.log(`[Bot] Attempt ${i + 1}: Pressing Shift+C`);
-      await page.keyboard.down("Shift");
-      await page.keyboard.press("c");
-      await page.keyboard.up("Shift");
+    // Already on? bail early
+    const alreadyOn = page.locator('button[aria-label*="Turn off captions" i]');
+    if (await alreadyOn.isVisible({ timeout: 1500 }).catch(() => false)) {
+      console.log("[Bot] Captions already ON");
+      return;
+    }
 
-      if (await this.captionsRegionVisible(page, 800)) {
-        console.log("[Bot] Captions enabled via Shift+C");
+    // Try Shift+C up to 6 times (atomic shortcut — more reliable than down/press/up)
+    for (let i = 0; i < 6; i++) {
+      if (this.exitRequested) return; // Stop Bot was clicked — exit early
+
+      console.log(`[Bot] Attempt ${i + 1}: Pressing Shift+C`);
+      await page.keyboard.press("Shift+C");
+
+      if (await this.captionsRegionVisible(page, 1200)) {
+        console.log("[Bot] Captions enabled via Shift+C ✅");
         return;
       }
-
-      const alreadyOn = page.locator('button[aria-label*="Turn off captions"]');
-      if (await alreadyOn.isVisible({ timeout: 1000 }).catch(() => false)) {
+      if (await alreadyOn.isVisible({ timeout: 800 }).catch(() => false)) {
         console.log("[Bot] Captions already ON");
         return;
       }
-
-      await page.waitForTimeout(600);
+      await page.waitForTimeout(700);
     }
 
-    // Fallback: click the "Turn on captions" button directly
-    await page.mouse.move(500, 700);
-    await page.waitForTimeout(300);
-    const ccBtn = page.locator('button[aria-label*="Turn on captions"]');
+    // Fallback 1: hover toolbar area and click "Turn on captions" button
+    await page.mouse.move(640, 680);
+    await page.waitForTimeout(400);
+    const ccBtn = page.locator('button[aria-label*="Turn on captions" i]');
     try {
-      await ccBtn.waitFor({ state: "visible", timeout: 4000 });
+      await ccBtn.waitFor({ state: "visible", timeout: 3000 });
       await ccBtn.click();
-      if (await this.captionsRegionVisible(page, 5000)) {
-        console.log("[Bot] Captions enabled via button click");
+      if (await this.captionsRegionVisible(page, 4000)) {
+        console.log("[Bot] Captions enabled via toolbar button ✅");
         return;
       }
     } catch {}
 
-    // Save debug screenshot and throw
+    // Fallback 2: try the More options (⋮) menu → "Turn on captions"
+    try {
+      const moreBtn = page.locator('button[aria-label*="More options" i], button[aria-label*="More actions" i]').first();
+      if (await moreBtn.isVisible({ timeout: 2000 })) {
+        await moreBtn.click();
+        await page.waitForTimeout(500);
+        const menuItem = page.locator('[role="menuitem"]:has-text("Turn on captions"), [role="menuitem"]:has-text("Captions")').first();
+        if (await menuItem.isVisible({ timeout: 2000 })) {
+          await menuItem.click();
+          if (await this.captionsRegionVisible(page, 4000)) {
+            console.log("[Bot] Captions enabled via More options menu ✅");
+            return;
+          }
+        }
+        await page.keyboard.press("Escape"); // close menu if no match
+      }
+    } catch {}
+
+    // Save debug screenshot then WARN (do NOT throw — bot stays in meeting)
     if (this.page) {
       const tmpDir = path.join(process.cwd(), "tmp");
       fs.mkdirSync(tmpDir, { recursive: true });
       const ss = path.join(tmpDir, `captions-fail-${Date.now()}.png`);
       await this.page.screenshot({ path: ss }).catch(() => undefined);
-      console.error(`[Bot] Caption enable failed. Screenshot: ${ss}`);
+      console.warn(`[Bot] ⚠️  Could not enable captions (screenshot: ${ss}). Bot will stay in meeting but may capture 0 lines.`);
     }
-    throw new Error("Could not enable captions using Shift+C or button click.");
+    // No throw — scrapeCaptions() will still run; if captions are already on for others
+    // in the room the MutationObserver may still catch them.
   }
 
   async stop(): Promise<void> {

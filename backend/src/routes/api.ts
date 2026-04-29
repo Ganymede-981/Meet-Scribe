@@ -59,8 +59,10 @@ apiRouter.post('/start', requireAuth, async (req: AuthenticatedRequest, res) => 
       // THIS RUNS WHEN THE BOT LEAVES THE MEETING
       const currentSession = sessions.get(session.id);
 
-      // Only summarize if it was successful, has text, and hasn't already been summarized
-      if (success && currentSession && currentSession.transcript.length > 0 && !currentSession.summary) {
+      // Summarize if there is ANY transcript — regardless of whether the bot exited
+      // cleanly (success=true) or was stopped early (success=false). This ensures
+      // clicking "Stop Bot" always produces a summary if captions were captured.
+      if (currentSession && currentSession.transcript.length > 0 && !currentSession.summary) {
         try {
           // Lock the summary state to prevent race conditions if the user clicks Stop simultaneously
           currentSession.summary = "processing";

@@ -51,6 +51,7 @@ function findChrome(): string | undefined {
 }
 
 export class MeetBot {
+  private browser: import('playwright').Browser | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
   public exitRequested = false;
@@ -61,22 +62,40 @@ export class MeetBot {
     try {
       send({ type: "status", status: "initializing", progress: 10 });
 
-      const botProfileDir = path.join(process.cwd(), "bot-profile");
-
-      if (!fs.existsSync(botProfileDir)) {
-        throw new Error(
-          "bot-profile folder not found. Please run: node generate-auth.js"
-        );
-      }
-
       const chromeExe = findChrome();
       console.log(`[Bot] Chrome exe: ${chromeExe ?? "bundled chromium"}`);
-      console.log(`[Bot] Profile dir: ${botProfileDir}`);
 
       const isProduction = process.env.NODE_ENV === 'production';
       const headless = isProduction;
 
-      this.context = await chromium.launchPersistentContext(botProfileDir, {
+      // ── Load Google auth cookies ──────────────────────────────
+      // Priority: GOOGLE_AUTH_JSON env var (Render) → auth.json file (local dev)
+      let storageState: object | undefined;
+
+      if (process.env.GOOGLE_AUTH_JSON) {
+        try {
+          storageState = JSON.parse(process.env.GOOGLE_AUTH_JSON);
+          console.log('[Bot] ✅ Loaded Google auth from GOOGLE_AUTH_JSON env var');
+        } catch {
+          console.error('[Bot] ❌ Failed to parse GOOGLE_AUTH_JSON — check that it is valid JSON');
+        }
+      } else {
+        const authFile = path.join(process.cwd(), 'auth.json');
+        if (fs.existsSync(authFile)) {
+          try {
+            storageState = JSON.parse(fs.readFileSync(authFile, 'utf-8'));
+            const count = (storageState as any).cookies?.length ?? 0;
+            console.log(`[Bot] ✅ Loaded Google auth from auth.json (${count} cookies)`);
+          } catch {
+            console.error('[Bot] ❌ Failed to parse auth.json');
+          }
+        } else {
+          console.warn('[Bot] ⚠️  No auth found (no GOOGLE_AUTH_JSON env var or auth.json). Bot may fail to join.');
+        }
+      }
+
+      // ── Launch browser ────────────────────────────────────────
+      const browser = await chromium.launch({
         headless,
         executablePath: chromeExe,
         args: [
@@ -90,7 +109,15 @@ export class MeetBot {
           ...(isProduction ? ["--disable-gpu", "--single-process"] : []),
         ],
         ignoreDefaultArgs: ["--enable-automation"],
+      });
+      this.browser = browser;
+
+      // ── Create context with injected Google session ───────────
+      this.context = await browser.newContext({
         viewport: { width: 1280, height: 800 },
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        permissions: ['microphone', 'camera'],
+        ...(storageState ? { storageState: storageState as any } : {}),
       });
 
       // Stealth: pass as string so esbuild cannot inject __name helpers
@@ -622,6 +649,12 @@ export class MeetBot {
         await this.context.close();
         this.context = null;
         this.page = null;
+      }
+    } catch {}
+    try {
+      if (this.browser) {
+        await this.browser.close();
+        this.browser = null;
       }
     } catch {}
   }

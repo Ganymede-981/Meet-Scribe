@@ -122,7 +122,7 @@ export function useMeetBot({ backendUrl, userId }: UseMeetBotProps): UseMeetBotR
         throw new Error('Server is taking too long to respond. It may be waking up — please try again in 30 seconds.');
       }
       if (err instanceof TypeError && err.message.includes('fetch')) {
-        throw new Error('Cannot reach backend. Check that VITE_BACKEND_URL is set correctly in Netlify.');
+        throw new Error('Cannot reach backend. Check that VITE_BACKEND_URL is set to your Render backend URL, and that FRONTEND_URL is set on the backend service.');
       }
       throw err;
     } finally {
@@ -140,8 +140,7 @@ export function useMeetBot({ backendUrl, userId }: UseMeetBotProps): UseMeetBotR
         wsUrl = backendUrl.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://') + `/ws?sessionId=${sessionId}`;
       } else {
         // Relative path fallback — only works when backend is same-origin.
-        // NOTE: Netlify cannot proxy WebSocket upgrades, so this WILL fail
-        // unless VITE_BACKEND_URL is set to the Render URL.
+        // VITE_BACKEND_URL should always be set to the Render backend URL.
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         wsUrl = `${protocol}//${window.location.host}/ws?sessionId=${sessionId}`;
       }

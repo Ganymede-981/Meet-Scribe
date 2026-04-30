@@ -110,10 +110,9 @@ export class MeetBot {
           ...(isProduction ? [
             '--disable-gpu',
             '--disable-dev-shm-usage', // Avoids /dev/shm OOM in Docker/Render
-            '--disable-extensions',
-            '--disable-background-networking',
-            '--disable-default-apps',
-            '--no-first-run',
+            '--no-zygote',             // Disables zygote process to save RAM
+            '--single-process',        // Crucial for 512MB Render free tier
+            '--js-flags="--max-old-space-size=256"' // Restricts V8 memory
           ] : []),
         ],
         ignoreDefaultArgs: ['--enable-automation'],
@@ -506,9 +505,10 @@ export class MeetBot {
     ];
 
     for (const text of possibilities) {
-      const btn = page.locator(`button:has-text("${text}")`).first();
+      // Append :visible so we don't accidentally select a hidden mobile-layout button and timeout
+      const btn = page.locator(`button:has-text("${text}"):visible`).first();
       try {
-        await btn.waitFor({ state: "visible", timeout: 3000 });
+        await btn.waitFor({ state: "visible", timeout: 2500 });
         await btn.click();
         console.log(`[Bot] Clicked join button: "${text}"`);
         return;
@@ -520,13 +520,15 @@ export class MeetBot {
     const count = await allBtns.count();
     for (let i = 0; i < count; i++) {
       const btn = allBtns.nth(i);
-      const label = (await btn.textContent())?.trim() ?? "";
-      if (/join/i.test(label)) {
-        try {
-          await btn.click();
-          console.log(`[Bot] Fallback clicked: "${label}"`);
-          return;
-        } catch {}
+      if (await btn.isVisible()) {
+        const label = (await btn.textContent())?.trim() ?? "";
+        if (/join/i.test(label)) {
+          try {
+            await btn.click();
+            console.log(`[Bot] Fallback clicked: "${label}"`);
+            return;
+          } catch {}
+        }
       }
     }
 
